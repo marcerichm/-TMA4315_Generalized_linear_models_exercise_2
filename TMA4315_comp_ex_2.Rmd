@@ -17,7 +17,9 @@ output: # 3rd letter intentation hierarchy
 library(formatR)
 showsol <- FALSE
 library(knitr)
-opts_chunk$set(tidy.opts = list(width.cutoff = 68), tidy = TRUE, warning = FALSE, error = FALSE, message = FALSE, echo = TRUE)
+library(ggplot2)
+opts_chunk$set(tidy.opts = list(width.cutoff = 68), tidy = TRUE, 
+               warning = FALSE, error = FALSE, message = FALSE, echo = TRUE)
 ```
 
 # Part 1
@@ -26,29 +28,39 @@ opts_chunk$set(tidy.opts = list(width.cutoff = 68), tidy = TRUE, warning = FALSE
 
 _italic_
 
-To get a pdf file, make comments of the lines with the "html_document" information, and make the lines with the "pdf_document" information regular, and vice versa.
+To get a pdf file, make comments of the lines with the "html_document" 
+information, and make the lines with the "pdf_document" information regular, 
+and vice versa.
 
 ## a)
 
-Your answer for part 1a)
+The log-likelihood function for a binary regression model: 
+$$\ell(\beta) = \sum_{i=1}^n y_i ln(\pi_i) + (1-y_i)ln(1-\pi_i)$$
+How we arrived at this expression:
+1. Start with the link function, aka logarithm of the odds, $ln(\frac{\pi}{1-\pi}) = \sum_{i=0}^n \beta_i x_{i}$, where $x_0=1$. This can be written as $\pi = \frac{1}{1+e^{-\sum_{i=0}^n \beta_i x_{i}}}$ 
+2. Then we formulate the likelihood: $L(\beta) = \prod_{i=1}^n P(x_i | \beta) = \prod_{i=1}^n \left(\frac{1}{1 + \exp(-(\beta x_i))}\right)^{y_i} \left(1 - \frac{1}{1 + \exp(-(\beta x_i))}\right)^{1-y_i}$ (here $\beta$ and $x_i$ are vectors, and $y_i$ is the response-variable). 
+3. We get the log-likelihood by taking the logarithm: $\ell(\beta) = \sum_{i=1}^n \left[ y_i \log\left(\frac{1}{1 + \exp(-(\beta x_i))}\right) + (1 - y_i) \log\left(1 - \frac{1}{1 + \exp(-(\beta x_i))}\right) \right]$
+4. We put $\pi = \frac{1}{1 + \exp(-(\beta x_i))}$ and get $\ell(\beta) = \sum_{i=1}^n \left[ y_i \log\left(\pi_i\right) + (1 - y_i) \log\left(1 - \pi_i\right) \right]$. 
+
+## b)
 
 ```{r}
-# some R code for part 1a)
-library(ggplot2)
-ggplot(data.frame(x = 1:10, Group = rep(c("A", "B"), 5)), aes(x = x, y = x, col = Group)) + geom_point() + theme_bw()
+# importing data
+filepath <- "https://www.math.ntnu.no/emner/TMA4315/2018h/mountains"
+mount <- read.table(file = filepath, header = TRUE, col.names = c("height",
+    "prominence", "fail", "success"))
 ```
 
-The following is a numbered list:
+```{r}
+# fitting model
+logreg.mod = glm(cbind(success, fail) ~ height + prominence, data = mount, family = "binomial")
+summary(logreg.mod)
+# perform likelihood ratio test
+logreg.null_mod = glm(cbind(success, fail) ~ 1, data = mount, family = "binomial")
+anova(logreg.null_mod, logreg.mod, "LRT")
+# creating 95% confint for beta
 
-1. First
-2. Second
-3. Third
-
-And this is an unnumbered list:
-
-* GLM
-* rocks
-
-Equations can be made like this:
-
-$$\bf{Y} = \bf{X} \bf{\beta} + \bf{\varepsilon}$$
+```
+* We can see from the estimates that the log(odds) decrease when height or prominence increase, meaning the chance of success decreases. 
+* The p-values obtained by performed wald-test suggest that the covariates are very signifacant. We also performed LRT, where the decrease in residual deviance from 715.29 in Model 1 to 414.68 in Model 2 indicates that Model 2 fits the data significantly better.
+* 

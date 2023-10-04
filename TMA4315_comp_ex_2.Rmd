@@ -59,8 +59,14 @@ summary(logreg.mod)
 logreg.null_mod = glm(cbind(success, fail) ~ 1, data = mount, family = "binomial")
 anova(logreg.null_mod, logreg.mod, "LRT")
 # creating 95% confint for beta
-
+cat(" \n Confidence interval: \n")
+confint(logreg.mod)
+cat(" \n exp(CI): \n")
+exp(confint(logreg.mod))
 ```
 * We can see from the estimates that the log(odds) decrease when height or prominence increase, meaning the chance of success decreases. 
-* The p-values obtained by performed wald-test suggest that the covariates are very signifacant. We also performed LRT, where the decrease in residual deviance from 715.29 in Model 1 to 414.68 in Model 2 indicates that Model 2 fits the data significantly better.
-* 
+* The p-values obtained by performed wald-test suggest that the covariates are very significant. We also performed LRT, where the decrease in residual deviance from 715.29 in Model 1 to 414.68 in Model 2 indicates that Model 2 fits the data significantly better.
+* CI for height: (-0.0019157664 -1.359060e-03), which also clearly indicates a negative log-odds relation between height and success. 
+* In we take $(exp(\beta_L), exp(\beta_H))$ we get the odds instead of the log-odds, which is given above under exp(CI). Here, since odds-confidence interval for height and prominence displays values <1, it indicates that for unit increase in height and prominence the odds for success diminishes. 
+
+

@@ -69,4 +69,9 @@ exp(confint(logreg.mod))
 * CI for height: (-0.0019157664 -1.359060e-03), which also clearly indicates a negative log-odds relation between height and success. 
 * In we take $(exp(\beta_L), exp(\beta_H))$ we get the odds instead of the log-odds, which is given above under exp(CI). Here, since odds-confidence interval for height and prominence displays values <1, it indicates that for unit increase in height and prominence the odds for success diminishes. 
 
+## c) 
 
+```{r}
+print(logreg.mod$deviance)
+
+```

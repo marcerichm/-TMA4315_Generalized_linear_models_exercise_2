@@ -2,15 +2,15 @@
 title: "TMA4315: Compulsory exercise 1 (title)" 
 subtitle: "Group 0: Name1, Name2 (subtitle)" 
 date: "`r format(Sys.time(), '%d.%m.%Y')`" # the current date, can be regular text as well
-output: # 3rd letter intentation hierarchy
-  html_document:
-    toc: true
-    toc_float: true
-    toc_depth: 2
-  # pdf_document:
-  #  toc: false
-  #  toc_depth: 2
-
+output:
+  bookdown::pdf_document2:
+    keep_tex: yes
+    toc: no
+    number_sections: false
+  html_document: default
+  pdf_document: default
+header-includes:
+  - \usepackage{bm}
 ---
 
 ```{r setup, include = FALSE}
@@ -21,6 +21,11 @@ library(ggplot2)
 opts_chunk$set(tidy.opts = list(width.cutoff = 68), tidy = TRUE, 
                warning = FALSE, error = FALSE, message = FALSE, echo = TRUE)
 ```
+
+```{r}
+library(tidyverse)
+```
+
 
 # Part 1
 
@@ -92,3 +97,63 @@ ggplot(plot_data, aes(x = Prominence, y = DevRes)) +
        title = "Deviance Residuals vs Prominence")
 
 ```
+
+
+# Part 2
+
+```{r}
+filepath <- "https://www.math.ntnu.no/emner/TMA4315/2023h/eliteserien2023.csv"
+eliteserie <- read.csv(file = filepath) %>% drop_na()
+
+NGames <- table(c(eliteserie$home[!is.na(eliteserie$yh)], eliteserie$away[!is.na(eliteserie$yh)]))
+RangeofGames <- range(NGames)
+```
+
+
+##  a)
+The null hypothesis is that the goals scored by a team is independent of wheather they are home or away, e.g. that the goals scored by the home- and away team are independently distributed. In this case we have two team categories which can score M goals, where $M = \max_{ij}{O_{ij}}$, $\mathbf{O} \in \mathbb{R}^{2\times M}$ is the matrix representing the contingency table. The matrix of expected frequencies, whose entries are  given by
+\begin{equation*}
+  E_{ij} = \frac{\sum_p{\mathbf{O}_{ip}} + \sum_k{\mathbf{O}_{kj}}}{\sum_{p, k}{\mathbf{O}_{pk}}}
+\end{equation*}
+can be written in matrix form as
+\begin{equation}
+  (\#eq:expfreq)
+  \mathbf{E} = \frac{\mathbf{O}\bm{1}_M\bm{1}_2^T\mathbf{O}}{\bm{1}^T_2\mathbf{O}\bm{1}_M}
+\end{equation}
+where $\bm{1}_k \in \mathbb{R}^k$ is the k-dimensional vector of ones. Using the definition of $\mathbf{O}$ and Equation \@ref{eq:expfreq}, the $\chi^2$-test can be written
+\begin{equation}
+  \chi^2 = \sum_{i, j}{\frac{\mathbf{O}_{ij} - \mathbf{E}_{ij}}{\mathbf{E}_{ij}}}
+\end{equation}
+This value is distributed by $\chi^2_{M-1}$ under the null hypothesis.
+```{r}
+O <- rbind(table(eliteserie$yh), table(eliteserie$ya)) %>% as.matrix
+O[2, (max(eliteserie$ya)+2):(max(eliteserie$yh)+1)]  <- 0
+
+M <- max(eliteserie$yh) + 1
+E <- c(O %*% rep(1, M)) %o% c(t(O) %*% rep(1, 2)) / c(rep(1, 2) %*% O %*% rep(1, M))
+chi_sq <- sum((O - E)^2/E)
+p.chi_sq <- pchisq(chi_sq, M-1, lower.tail=FALSE)
+```
+The p-value of the $\chi^2$ test is significant, and one can therefore conclude that the goals scored by the home- and away team are not independent. The assumption of independence is therefore not always reasonable.
+
+
+# b)
+```{r}
+df.scores <- inner_join(
+  eliteserie %>% # Score from home- and away matches
+    group_by(home) %>%
+    summarize(score=3*sum(yh > ya) + 1*sum(yh == ya)),
+  eliteserie %>%
+    group_by(away) %>%
+    summarize(score=3*sum(yh < ya)),
+  by=c("home" = "away")
+) %>%
+  mutate(score=score.x + score.y) %>%
+  select(-c("score.x", "score.y"))
+```
+
+```{r}
+df.scores
+```
+
+TODO: Account for teams with equal score.

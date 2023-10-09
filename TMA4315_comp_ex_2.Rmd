@@ -72,6 +72,23 @@ exp(confint(logreg.mod))
 ## c) 
 
 ```{r}
-print(logreg.mod$deviance)
+dev_res <- residuals(logreg.mod, type = "deviance")
+
+# Create a data frame to use with ggplot2
+plot_data <- data.frame(Height = logreg.mod$data$height, 
+                        Prominence = logreg.mod$data$prominence, 
+                        DevRes = dev_res)
+
+# Plotting deviance residuals against height
+ggplot(plot_data, aes(x = Height, y = DevRes)) +
+  geom_point() +
+  labs(x = "Height", y = "Deviance Residuals", 
+       title = "Deviance Residuals vs Height")
+
+# Plotting deviance residuals against prominence
+ggplot(plot_data, aes(x = Prominence, y = DevRes)) +
+  geom_point() +
+  labs(x = "Prominence", y = "Deviance Residuals", 
+       title = "Deviance Residuals vs Prominence")
 
 ```

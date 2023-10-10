@@ -145,7 +145,7 @@ df.scores <- inner_join(
     summarize(score=3*sum(yh > ya) + 1*sum(yh == ya)),
   eliteserie %>%
     group_by(away) %>%
-    summarize(score=3*sum(yh < ya)),
+    summarize(score=3*sum(yh < ya) + 1*sum(yh == ya)),
   by=c("home" = "away")
 ) %>%
   mutate(score=score.x + score.y) %>%
@@ -157,3 +157,43 @@ df.scores
 ```
 
 TODO: Account for teams with equal score.
+
+## c)
+The first step is to transform the data into a suitable design matrix. In  this case, the score should be the response, the team should be a category, and wheather it is away or home should be another category.
+
+```{r}
+glm.data <- eliteserie %>%
+  gather(key='is_home', value='team', home, away) %>%
+  gather(key='y_type', value='y', yh, ya) %>%
+  filter((is_home == "home" & y_type == "yh") | (is_home == "away" & y_type == "ya")) %>%
+  select(-c(y_type, X)) %>%
+  mutate(is_home=ifelse(is_home == 'home', TRUE, FALSE))
+```
+```{r}
+fisher_score_iteration <- function(beta, X, y) {
+  s <- t(y - exp(X %*% beta)) %*% X
+  F <- matrix(nrow=ncol(X), ncol=ncol(X))
+  for (i in 1:nrow(X)) {
+    F <- F + c(exp(X[i, ] %*% beta)) * X[i, ] %o% X[i, ]
+  }
+  return(beta + solve(F, s))
+}
+```
+
+
+```{r}
+fit_coefficients <- function(formula, data, contrasts = NULL, ...) {
+  # Extract model matrix & responses
+  mf <- model.frame(formula = formula, data = data)
+  X  <- model.matrix(attr(mf, "terms"), data = mf, contrasts.arg = contrasts)
+  y  <- model.response(mf)
+  terms <- attr(mf, "terms")
+
+  return(fisher_score_iteration(rep(0.5, ncol(X)), X, y))
+}
+```
+
+```{r}
+fit_coefficients(y ~ team + is_home, data=glm.data)
+```
+

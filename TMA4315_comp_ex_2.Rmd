@@ -14,17 +14,22 @@ header-includes:
 ---
 
 ```{r setup, include = FALSE}
-library(formatR)
-showsol <- FALSE
-library(knitr)
-library(ggplot2)
 opts_chunk$set(tidy.opts = list(width.cutoff = 68), tidy = TRUE, 
                warning = FALSE, error = FALSE, message = FALSE, echo = TRUE)
 ```
 
 ```{r}
+rm(list=ls())
+
+showsol <- FALSE
+
+library(formatR)
+library(knitr)
+library(ggplot2)
 library(tidyverse)
-library(glue)
+library(glue)      # fstring-like
+library(doSNOW)    # Parallel computing
+library(foreach)
 ```
 
 
@@ -236,45 +241,100 @@ Asserting that they are indeed correct using the builtin glm function in R:
 ```{r}
 ref.coeffs <- glm(y ~ team + is_home, data=eliteserie.played.transf, family='poisson')$coefficients
 abs(mean(my.coeffs - ref.coeffs))
-my.coeffs[["is_homeTRUE"]]
 ```
 
 Looks good!
 
 ## d)
-First adding the reference level Tromsø to the list `my.coeffs`.
+In order to simulate, we first need to add the coefficient of the reference level to `my.coeffs`.
 ```{r}
 my.coeffs[['teamAalesund']] <- 0
 ```
 
+Simulation can be done in the following steps:
+1. Estimate $\hat{\lambda}$ for each team in each match using the model, i.e.
+\begin{align*}
+  \hat{\lambda_{i, H}} &= \exp{\left(\beta_0 + \beta_H + \beta_H - \beta_A \right)} \\
+  \hat{\lambda_{i, A}} &= \exp{\left(\beta_0 + \beta_A - \beta_H \right)}
+\end{align*}
+2. For $m$ simulations, and for all $i$ matches, simulate the goals of each team assuming they follow a Poisson distribution with rate $\hat{\lambda}_{i, H}$ and $\hat{\lambda}_{i, A}$ for the home- and away teams  respectively.
 
+We will first implement the function to estimate the rate for each match. Since I have created the model a bit differently, I will do this manually  by retrieving each respective coefficient.
 ```{r}
-simulate_match <- function(match) {
+estimate_lambda <- function(match) {
+  # Args:
+  #   match (DataFrame row): Row of the eliteserie dataframe, ya and yh may be excluded
+  # Returns:
+  #   Same row but with lambda estimates.
+  # Retrieving the coefficients
   coeff.home <- my.coeffs[[glue("team{match$home}")]]
   coeff.away <- my.coeffs[[glue("team{match$away}")]]
-  match$yh <- round(exp(my.coeffs[["(Intercept)"]] + my.coeffs[["is_homeTRUE"]] + coeff.home - coeff.away))
-  match$ya <- round(exp(my.coeffs[["(Intercept)"]] + coeff.away - coeff.home))
+  
+  # Calculating rates
+  match$lambda.h <- exp(my.coeffs[["(Intercept)"]] + my.coeffs[["is_homeTRUE"]] + coeff.home - coeff.away)
+  match$lambda.a <- exp(my.coeffs[["(Intercept)"]] + coeff.away - coeff.home)
+  
   return(match)
 }
 ```
 
-
 ```{r}
-eliteserie.unplayed.sim <- eliteserie.unplayed %>%
-  {lapply(split(., seq_len(nrow(.))), simulate_match)} %>%
+eliteserie.unplayed.est <- eliteserie.unplayed %>%
+  rename(lambda.h=yh, lambda.a=ya) %>%
+  {lapply(split(., seq_len(nrow(.))), estimate_lambda)} %>%
   {do.call(rbind, .)}
-
-eliteserie.sim <- rbind(eliteserie.played, eliteserie.unplayed.sim)
 ```
 
-Finally, calculating the total simulates score:
+Now using the estimated rates to simulate 1000 matches.
 ```{r}
-scores.sim <- calculate_scores(eliteserie.sim) %>%
-  mutate(position=rank(-score, ties.method='min')) %>%
-  inner_join(scores.played %>% select(-score), by='team') %>%
-  mutate(position_change=position.y - position.x) %>%
-  select(-position.y) %>%
-  rename(position=position.x)
+m <- 10000 # Number of  simulations
 
-scores.sim %>% arrange(position)
+simulate_dataframe <- function() {
+  eliteserie.unplayed.est %>%
+    mutate(
+      yh=rpois(n(), lambda.h),
+      ya=rpois(n(), lambda.a)
+    ) %>%
+    select(-c(lambda.h, lambda.a))
+}
 ```
+
+
+
+Using the result to calculate the scoreboard for each simulation:
+```{r}
+# Simulating matches and calculating the scores for each dataframe using parallel computing:
+num_cores <- parallel::detectCores() - 1
+cl <- makeCluster(num_cores, type="SOCK")
+registerDoSNOW(cl)
+
+scores.sim <- foreach(
+  i=1:m,
+  .packages='tidyverse'
+) %dopar%
+  {calculate_scores(rbind(eliteserie.played, simulate_dataframe()))} %>%
+  bind_rows() %>%
+  group_by(team) %>%
+  summarize(scores=list(score), score.mean=mean(score), score.sd=sd(score))
+
+stopCluster(cl)
+```
+
+
+Displaying the winner, on average
+```{r}
+scores.sim %>%
+  mutate(position=rank(-score.mean, ties.method='min')) %>%
+  arrange(position) %>%
+  select(-scores)
+```
+
+
+Plotting score distributionhistograms for all teams:
+```{r, fig.width=20, fig.height=12}
+ggplot(scores.sim %>% unnest(cols=scores), aes(x=scores)) +
+  geom_histogram(bins=50, fill="skyblue", color="black") +
+  facet_wrap(~ team, scales="free_y") +
+  labs(title="Score distribution for each team")
+```
+

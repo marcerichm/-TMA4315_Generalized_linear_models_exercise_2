@@ -33,6 +33,161 @@ library(foreach)
 
 # Part 1
 
+## a)
+
+The _log-likelihood function_ for a binary regression model: 
+$$\ell(\beta) = \sum_{i=1}^n y_i ln(\pi_i) + (1-y_i)ln(1-\pi_i)$$
+How we arrived at this expression:
+
+**1.** Start with the link function, aka logarithm of the odds, $ln(\frac{\pi}{1-\pi}) = \sum_{i=0}^n \beta_i x_{i}$, where $x_0=1$. This can be written as $\pi = \frac{1}{1+e^{-\sum_{i=0}^n \beta_i x_{i}}}$ 
+
+**2.** Then we formulate the likelihood: $L(\beta) = \prod_{i=1}^n P(x_i | \beta) = \prod_{i=1}^n \left(\frac{1}{1 + \exp(-(\beta x_i))}\right)^{y_i} \left(1 - \frac{1}{1 + \exp(-(\beta x_i))}\right)^{1-y_i}$ (here $\beta$ and $x_i$ are vectors, and $y_i$ is the response-variable). 
+
+**3.** We get the log-likelihood by taking the logarithm: $\ell(\beta) = \sum_{i=1}^n \left[ y_i \log\left(\frac{1}{1 + \exp(-(\beta x_i))}\right) + (1 - y_i) \log\left(1 - \frac{1}{1 + \exp(-(\beta x_i))}\right) \right]$
+
+**4.** We put $\pi = \frac{1}{1 + \exp(-(\beta x_i))}$ and get $\ell(\beta) = \sum_{i=1}^n \left[ y_i \log\left(\pi_i\right) + (1 - y_i) \log\left(1 - \pi_i\right) \right]$. 
+
+**5.** To then get the Maximum likelihood estimate, we use an optimization method on the likelihood function to find the maximum and the likelihood function. To do this one often finds the zero of the derivative, which in our case is the score-function. 
+
+## b)
+
+```{r}
+# importing data
+filepath <- "https://www.math.ntnu.no/emner/TMA4315/2018h/mountains"
+mount <- read.table(file = filepath, header = TRUE, col.names = c("height",
+    "prominence", "fail", "success"))
+```
+
+```{r}
+# fitting model
+logreg.mod = glm(cbind(success, fail) ~ height + prominence, data = mount, family = "binomial")
+summary(logreg.mod)
+# perform likelihood ratio test
+logreg.null_mod = glm(cbind(success, fail) ~ 1, data = mount, family = "binomial")
+anova(logreg.null_mod, logreg.mod, "LRT")
+# creating 95% confint for beta
+cat(" \n Confidence interval: \n")
+confint(logreg.mod)
+cat(" \n exp(CI): \n")
+exp(confint(logreg.mod))
+```
+
+* We can see from the estimates that the log(odds) decrease when height or prominence increase, meaning the chance of success decreases. More generally, this means that when we multiply the coefficients with 1 unit, it signifies by how much the log(odds) are effected by the covariate that coefficient belongs to. 
+* The p-values obtained by performed wald-test (which is how R calculates the p-values found in the summary, and is performed by using the formula $w = \left( C\hat{\beta} - d \right)^T \left[ C F^{-1}(\hat{\beta}) C^T \right]^{-1} \left( C\hat{\beta} - d \right)$, but when testing only one coefficient this becomes $\left( \hat{\beta}_k - \beta_k \right) \left[ a_{kk}(\hat{\beta}) \right]^{-1} \left( \hat{\beta}_k - \beta_k \right)$) suggest that the covariates are very significant. We also performed LRT, where the decrease in residual deviance from 715.29 in Model 1 to 414.68 in Model 2 indicates that Model 2 fits the data significantly better.
+* CI for height: (-0.0019157664 -1.359060e-03), which also clearly indicates a negative log-odds relation between height and success.This CI are based on the likelihood function. They are more accurate than Wald intervals, especially for small sample sizes. The **confint()** function calculates these intervals by finding the values of the parameter for which the likelihood function takes a specific value. This method doesn’t rely on the normal approximation, and it’s often used when the sample size is small.
+* If we take $(exp(\beta_L), exp(\beta_H))$ we get the odds instead of the log-odds, which is given above under exp(CI). Here, since odds-confidence interval for height and prominence displays values <1, it indicates that for unit increase in height and prominence the odds for success diminishes. 
+
+## c) 
+
+```{r}
+dev_res <- residuals(logreg.mod, type = "deviance")
+
+# Create a data frame to use with ggplot2
+plot_data <- data.frame(Height = logreg.mod$data$height, 
+                        Prominence = logreg.mod$data$prominence, 
+                        DevRes = dev_res)
+
+# Plotting deviance residuals against height
+ggplot(plot_data, aes(x = Height, y = DevRes)) +
+  geom_point() +
+  labs(x = "Height", y = "Deviance Residuals", 
+       title = "Deviance Residuals vs Height")
+
+# Plotting deviance residuals against prominence
+ggplot(plot_data, aes(x = Prominence, y = DevRes)) +
+  geom_point() +
+  labs(x = "Prominence", y = "Deviance Residuals", 
+       title = "Deviance Residuals vs Prominence")
+
+n = 100
+# initializing height vector and prominence vector
+min_height = min(mount$height)
+max_heigth = max(mount$height)
+min_prominence = min(mount$prominence)
+max_prominence = max(mount$prominence)
+seq_height = seq(from=min_height, to=max_heigth, length.out=n)
+seq_prominence = seq(from=min_prominence, to=max_prominence, length.out=n)
+
+# generating estimated probabilities matrix 
+loglikmat <- matrix(NA, nrow = n, ncol = n)
+loglikframe <- data.frame()
+for (i in 1:length(seq_height)){
+  for (j in 1:length(seq_prominence)){
+    loglikmat[i,j] <- predict(logreg.mod, newdata = data.frame(height = c(seq_height[i]), prominence = c(seq_prominence[j])), type = "response")
+    loglikframe <- rbind(loglikframe, c(seq_height[i], seq_prominence[j], loglikmat[i,j]))
+  }
+}
+names(loglikframe) <- c("Height", "Prominence", "Prob")
+head(loglikframe)
+
+# plotting 
+ggplot(data = loglikframe, aes(x = Height, y = Prominence, z = Prob)) + geom_raster(aes(fill = Prob)) +
+  geom_point(data = loglikframe[which.max(loglikframe$prob),], mapping = aes(x = Height, y = Prominence), 
+             size = 5, col = "red", shape = 21, stroke = 2) + scale_shape(solid = FALSE) + geom_contour(col = "black") 
+
+```
+
+There does not seem to be any significant pattern when plotting the deviance residuals against the covariates. They seem to be randomly distributed around 0. There is a higher concentration of residuals in the lower heights, but that is only because there a less samples of people climbing the highest mountains. 
+
+From the plot of the probabilities as a function of height and prominence we see what we expected, namely that the higher the Height and prominence of the mountain, the smaller the chance of success. 
+
+
+## d) 
+We have that as the number of samples $n$ where $n \rightarrow \infty$, and then $ln(\frac{p}{1-p}) = y = \sum^q_{i=0} x_i\beta_i \sim N(x^T\beta, F^{-1}(\beta))$. We construct a confidence interval for $y$, and then transform the interval. We have: 
+$$ 
+N(0,1) \sim \frac{y - x^T\beta}{\sqrt{a_{kk}}}
+$$
+where $a_{kk} = (F^{-1}(\beta))_{kk}$.
+
+Which gives us the confidence interval 
+$$
+\left( x^T\beta - z_{\alpha/2} \sqrt{a_{kk}} \; , \; x^T\beta + z_{\alpha/2} \sqrt{a_{kk}}  \right)
+$$
+Transforming this interval so we get the probability instead of log-odds we get the interval: 
+$$
+\left( \frac{e^{x^T\beta - z_{\alpha/2} \sqrt{a_{kk}}}}{1 + e^{x^T\beta - z_{\alpha/2} \sqrt{a_{kk}}}} \; , \; \frac{e^{x^T\beta + z_{\alpha/2} \sqrt{a_{kk}}}}{1 + e^{x^T\beta + z_{\alpha/2} \sqrt{a_{kk}}}} \right)
+$$
+We do the calculations for the CI in R:
+```{r}
+std_errors <- c(1.064, 0.0001420, 0.00004554)
+
+# Z-score for 95% confidence interval
+z_score <- 1.96
+
+# Mountain data
+mountains <- list(
+  Everest = c(1, 8848, 8848),
+  Chogolisa = c(1, 7665, 1624)
+)
+
+# Function to calculate results
+calculate_results <- function(features, coefficients, std_errors, z_score) {
+  # Calculate linear predictor
+  eta <- sum(features * coefficients)
+  
+  # Transform to probability
+  p_hat <- exp(eta) / (1 + exp(eta))
+  
+  # Calculate standard error of the linear predictor
+  se_eta <- sqrt(sum((features * std_errors)^2))
+  
+  # Confidence interval for linear predictor
+  ci_eta <- c(eta - z_score * se_eta, eta + z_score * se_eta)
+  
+  # Transform confidence interval to probability scale
+  ci_p <- exp(ci_eta) / (1 + exp(ci_eta))
+  
+  return(list(eta = eta, p_hat = p_hat, se_eta = se_eta, ci_eta = ci_eta, ci_p = ci_p))
+}
+
+# Calculate and print results for both mountains
+results <- lapply(mountains, calculate_results, logreg.mod$coefficients, std_errors, z_score)
+print(results)
+```
+
+The model estimates a 9% success rate for ascending Mount Everest, with a 95% confidence interval ranging from 0.4% to 73.2%. This wide confidence interval reflects a high level of uncertainty, likely due to the extreme values of height and prominence for Everest as compared to the mountains in the training data.
+
+For Chogolisa, the estimated success rate is 71%, with a 95% confidence interval from 10.8% to 97.9%. Though the confidence interval is also wide, the point estimate is closer to the empirical success rate of 91%. 
 
 
 # Part 2

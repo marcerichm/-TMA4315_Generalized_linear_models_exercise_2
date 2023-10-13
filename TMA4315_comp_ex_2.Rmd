@@ -1,4 +1,4 @@
---- 
+---
 title: "TMA4315: Compulsory exercise 1 (title)" 
 subtitle: "Group 0: Name1, Name2 (subtitle)" 
 date: "`r format(Sys.time(), '%d.%m.%Y')`" # the current date, can be regular text as well
@@ -7,16 +7,14 @@ output:
     keep_tex: yes
     toc: no
     number_sections: false
-  html_document: default
-  pdf_document: default
 header-includes:
   - \usepackage{bm}
 ---
 
-```{r setup, include = FALSE}
-opts_chunk$set(tidy.opts = list(width.cutoff = 68), tidy = TRUE, 
-               warning = FALSE, error = FALSE, message = FALSE, echo = TRUE)
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 68), tidy = TRUE, warning = FALSE, error = FALSE, message = FALSE, echo = TRUE)
 ```
+
 
 ```{r}
 rm(list=ls())
@@ -35,78 +33,9 @@ library(foreach)
 
 # Part 1
 
-**Bold**
-
-_italic_
-
-To get a pdf file, make comments of the lines with the "html_document" 
-information, and make the lines with the "pdf_document" information regular, 
-and vice versa.
-
-## a)
-
-The log-likelihood function for a binary regression model: 
-$$\ell(\beta) = \sum_{i=1}^n y_i ln(\pi_i) + (1-y_i)ln(1-\pi_i)$$
-How we arrived at this expression:
-1. Start with the link function, aka logarithm of the odds, $ln(\frac{\pi}{1-\pi}) = \sum_{i=0}^n \beta_i x_{i}$, where $x_0=1$. This can be written as $\pi = \frac{1}{1+e^{-\sum_{i=0}^n \beta_i x_{i}}}$ 
-2. Then we formulate the likelihood: $L(\beta) = \prod_{i=1}^n P(x_i | \beta) = \prod_{i=1}^n \left(\frac{1}{1 + \exp(-(\beta x_i))}\right)^{y_i} \left(1 - \frac{1}{1 + \exp(-(\beta x_i))}\right)^{1-y_i}$ (here $\beta$ and $x_i$ are vectors, and $y_i$ is the response-variable). 
-3. We get the log-likelihood by taking the logarithm: $\ell(\beta) = \sum_{i=1}^n \left[ y_i \log\left(\frac{1}{1 + \exp(-(\beta x_i))}\right) + (1 - y_i) \log\left(1 - \frac{1}{1 + \exp(-(\beta x_i))}\right) \right]$
-4. We put $\pi = \frac{1}{1 + \exp(-(\beta x_i))}$ and get $\ell(\beta) = \sum_{i=1}^n \left[ y_i \log\left(\pi_i\right) + (1 - y_i) \log\left(1 - \pi_i\right) \right]$. 
-
-## b)
-
-```{r}
-# importing data
-filepath <- "https://www.math.ntnu.no/emner/TMA4315/2018h/mountains"
-mount <- read.table(file = filepath, header = TRUE, col.names = c("height",
-    "prominence", "fail", "success"))
-```
-
-```{r}
-# fitting model
-logreg.mod = glm(cbind(success, fail) ~ height + prominence, data = mount, family = "binomial")
-summary(logreg.mod)
-# perform likelihood ratio test
-logreg.null_mod = glm(cbind(success, fail) ~ 1, data = mount, family = "binomial")
-anova(logreg.null_mod, logreg.mod, "LRT")
-# creating 95% confint for beta
-cat(" \n Confidence interval: \n")
-confint(logreg.mod)
-cat(" \n exp(CI): \n")
-exp(confint(logreg.mod))
-```
-* We can see from the estimates that the log(odds) decrease when height or prominence increase, meaning the chance of success decreases. 
-* The p-values obtained by performed wald-test suggest that the covariates are very significant. We also performed LRT, where the decrease in residual deviance from 715.29 in Model 1 to 414.68 in Model 2 indicates that Model 2 fits the data significantly better.
-* CI for height: (-0.0019157664 -1.359060e-03), which also clearly indicates a negative log-odds relation between height and success. 
-* In we take $(exp(\beta_L), exp(\beta_H))$ we get the odds instead of the log-odds, which is given above under exp(CI). Here, since odds-confidence interval for height and prominence displays values <1, it indicates that for unit increase in height and prominence the odds for success diminishes. 
-
-## c) 
-
-```{r}
-dev_res <- residuals(logreg.mod, type = "deviance")
-
-# Create a data frame to use with ggplot2
-plot_data <- data.frame(Height = logreg.mod$data$height, 
-                        Prominence = logreg.mod$data$prominence, 
-                        DevRes = dev_res)
-
-# Plotting deviance residuals against height
-ggplot(plot_data, aes(x = Height, y = DevRes)) +
-  geom_point() +
-  labs(x = "Height", y = "Deviance Residuals", 
-       title = "Deviance Residuals vs Height")
-
-# Plotting deviance residuals against prominence
-ggplot(plot_data, aes(x = Prominence, y = DevRes)) +
-  geom_point() +
-  labs(x = "Prominence", y = "Deviance Residuals", 
-       title = "Deviance Residuals vs Prominence")
-
-```
 
 
 # Part 2
-
 ```{r}
 filepath <- "https://www.math.ntnu.no/emner/TMA4315/2023h/eliteserien2023.csv"
 eliteserie <- read.csv(file = filepath)
@@ -119,7 +48,7 @@ RangeofGames <- range(NGames)
 
 
 ##  a)
-The null hypothesis is that the goals scored by a team is independent of wheather they are home or away, e.g. that the goals scored by the home- and away team are independently distributed. In this case we have two team categories which can score M goals, where $M = \max_{ij}{O_{ij}}$, $\mathbf{O} \in \mathbb{R}^{2\times M}$ is the matrix representing the contingency table. The matrix of expected frequencies, whose entries are  given by
+The null hypothesis is that the goals scored by a team is independent of whether they are home or away, i.e. that the goals scored by the home- and away team are independently distributed. In this case we have two team categories which can score M goals, where $M = \max_{ij}{O_{ij}}$, $\mathbf{O} \in \mathbb{R}^{2\times M}$ is the matrix representing the contingency table. The matrix of expected frequencies, whose entries are  given by
 \begin{equation*}
   E_{ij} = \frac{\sum_p{\mathbf{O}_{ip}} + \sum_k{\mathbf{O}_{kj}}}{\sum_{p, k}{\mathbf{O}_{pk}}}
 \end{equation*}
@@ -141,8 +70,9 @@ M <- max(eliteserie.played$yh) + 1
 E <- c(O %*% rep(1, M)) %o% c(t(O) %*% rep(1, 2)) / c(rep(1, 2) %*% O %*% rep(1, M))
 chi_sq <- sum((O - E)^2/E)
 p.chi_sq <- pchisq(chi_sq, M-1, lower.tail=FALSE)
+p.chi_sq
 ```
-The p-value of the $\chi^2$ test is significant, and one can therefore conclude that the goals scored by the home- and away team are not independent. The assumption of independence is therefore not always reasonable.
+The p-value of the $\chi^2$ test is significant at $~0.017$, and one can therefore conclude that the goals scored by the home- and away team are not independent. The assumption of independence is therefore not always reasonable.
 
 
 # b)
@@ -179,10 +109,33 @@ scores.played <- calculate_scores(eliteserie.played) %>%
 scores.played %>% arrange(position)
 ```
 
-TODO: Account for teams with equal score.
+The only teams sharing scores are Haugesund, Sandefjord Fotball, and Vålerenga, each with 21 points.
+```{r}
+num_goals <- {inner_join(
+  eliteserie.played %>% # Score from home- and away matches
+    group_by(home) %>%
+    summarize(goals=sum(yh)),
+  eliteserie.played %>%
+    group_by(away) %>%
+    summarize(goals=sum(ya)),
+  by=c("home" = "away")
+)} %>%
+  mutate(goals=goals.x + goals.y) %>%
+  select(-c(goals.x, goals.y))
+
+num_goals[c(5, 10, 16), ]
+```
+Thus, 12th place goes to Sandefjord Fotball, 13th place goes to Vålerenga, and 14th place goes to Haugesund.
 
 ## c)
-The first step is to transform the data into a suitable design matrix. In  this case, the score should be the response, the team should be a category, and whether it is away or home should be another category.
+We want a model on the form
+
+\begin{equation*}
+  \ln{\mathbb{E}(Y)} = \beta_0 + \beta_{\mathrm{home}}x_{\mathrm{home}} + \mathbf{X}_{\mathrm{teams}}\bm{\beta}_{\mathrm{teams}}
+\end{equation*}
+where $\mathbf{X}_{\mathrm{teams}}$ is the sub matrix of the design matrix including the one-hot encoding for all teams, and $\bm{\beta}_{\mathrm{teams}}$ are the strength coefficients for each team.
+
+The first step to fit the model is to transform the data into a suitable design matrix. In  this case, the score should be the response, the team should be a category, and whether it is away or home should be another category. The first step to fit the model is to transform the data into a suitable design matrix. R will naturally handle the issue of linear dependence in the design matrix by making Aalesund a reference level.
 
 ```{r}
 eliteserie.played.transf <- eliteserie.played %>%
@@ -207,14 +160,14 @@ fisher_score_iteration <- function(beta, X, y) {
   n <- ncol(X)
   s <- c(t(y - exp(X %*% beta)) %*% X)
   Fisher <- matrix(rep(0, n^2), nrow=n, ncol=n)
-  for (i in 1:nrow(X)) {
+  for (i in 1:nrow(X)) { # This is not ideal, but multidimensional arrays are difficult to manage in R
     Fisher <- Fisher + c(exp(X[i, ] %*% beta)) * X[i, ] %o% X[i, ]
   }
   return(beta + solve(Fisher, s))
 }
 ```
 
-Reusing some of the code from `mylm`, we can easily obtain the design matrix $X$ and the response $y$, and run the Fisher scoring algorihtm. The algorithm converges very quickly, so 100 iterations should be more than safe. Alternatively, one can implement some stopping criterion based on the absolute difference in $\bm{\beta}^{(t)}$ or based on the likelihood function for $\bm{\beta}$.
+Reusing some of the code from `mylm`, we can easily obtain the design matrix $X$ and the response $y$, and run the Fisher scoring algorithm. The algorithm converges very quickly, so 100 iterations should be more than safe. Alternatively, one can implement some stopping criterion based on the absolute difference in $\bm{\beta}^{(t)}$, or based on the likelihood function for $\bm{\beta}$.
 ```{r}
 fit_coefficients <- function(formula, data, contrasts = NULL, ...) {
   # Extract model matrix & responses
@@ -231,24 +184,30 @@ fit_coefficients <- function(formula, data, contrasts = NULL, ...) {
 }
 ```
 
+This leads to the following coefficient estimates:
 ```{r}
 my.coeffs <- fit_coefficients(y ~ team + is_home, data=eliteserie.played.transf)
 my.coeffs
 ```
 
 
-Asserting that they are indeed correct using the builtin glm function in R:
+Asserting that they are indeed correct using the built in glm function in R:
 ```{r}
 ref.coeffs <- glm(y ~ team + is_home, data=eliteserie.played.transf, family='poisson')$coefficients
 abs(mean(my.coeffs - ref.coeffs))
 ```
-
 Looks good!
 
 ## d)
-In order to simulate, we first need to add the coefficient of the reference level to `my.coeffs`.
+In order to simulate 1000 matches, we first need to add the coefficient of the reference level to `my.coeffs`.
 ```{r}
-my.coeffs[['teamAalesund']] <- 0
+ref_coeff <- eliteserie$home %>% 
+  unique() %>% 
+  lapply(function(str) glue("team{str}")) %>% 
+  unlist() %>% 
+  setdiff(names(my.coeffs))
+
+my.coeffs[[ref_coeff]] <- 0
 ```
 
 Simulation can be done in the following steps:
@@ -278,6 +237,7 @@ estimate_lambda <- function(match) {
 }
 ```
 
+Now applying the above function to each row, giving us coefficient estimates of $\lambda$ for each team in every match.
 ```{r}
 eliteserie.unplayed.est <- eliteserie.unplayed %>%
   rename(lambda.h=yh, lambda.a=ya) %>%
@@ -285,9 +245,9 @@ eliteserie.unplayed.est <- eliteserie.unplayed %>%
   {do.call(rbind, .)}
 ```
 
-Now using the estimated rates to simulate 1000 matches.
+Finally, using the estimated rates in `eliteserie.unplayed.est` to simulate 1 000 matches, and then calculate the scroeboard for all simulations.
 ```{r}
-m <- 10000 # Number of  simulations
+m <- 1000 # Number of  simulations
 
 simulate_dataframe <- function() {
   eliteserie.unplayed.est %>%
@@ -299,11 +259,7 @@ simulate_dataframe <- function() {
 }
 ```
 
-
-
-Using the result to calculate the scoreboard for each simulation:
 ```{r}
-# Simulating matches and calculating the scores for each dataframe using parallel computing:
 num_cores <- parallel::detectCores() - 1
 cl <- makeCluster(num_cores, type="SOCK")
 registerDoSNOW(cl)
@@ -321,20 +277,32 @@ stopCluster(cl)
 ```
 
 
-Displaying the winner, on average
+With all realizations being saved in the dataframe `scores.sim`, we can easily summarize the result.
 ```{r}
 scores.sim %>%
   mutate(position=rank(-score.mean, ties.method='min')) %>%
-  arrange(position) %>%
-  select(-scores)
+  select(-scores) %>%
+  merge(scores.played[c('team', 'position')]  %>% rename(position.played=position), by='team') %>%
+  mutate(pos_change=position.played - position) %>%
+  select(-position.played) %>%
+  arrange(position)
 ```
+It is clear that Viking and Bodø/Glimt are leading by a substantial margin. Furthermore, most teams kept their positions as of October 1st, except for Molde and Brann, who switched. The models ability to estimate change in leaderboard based on the teams playing in the future is probably its best strength. The new leaderboard also appropriately positioned Haugesund, Vålerenga, and Sandefjord.
 
+One can also observe that the estimated standard deviation starts out quite small for the worst teams, and steadily increases with increasing score. This is due to the fact that the last 80 matches (33% of the championship) are simulated using a Poisson distribution, and the rest of the data for calculating the score is identical for all simulations. Let $S_i$ be the score for team $i$. The total variance for team $i$ is given by
 
-Plotting score distributionhistograms for all teams:
+\begin{equation}
+  (\#eq:var)
+  \mathrm{Var}(S_i) = \mathrm{Var}(\mathrm{Played}_i) + \mathrm{Var}(\mathrm{Simulated}_i) = 0 + \hat{\lambda}_i = \hat{\lambda}_i
+\end{equation}
+
+Where we in \@ref(eq:var) used the fact that the variance of observed variables is obviously 0. And thus, the standard deviation for each team is actually the square root of their expected score increase during the last eighty matches (according to the simulation).
+
+Plotting score distribution histograms for all teams:
 ```{r, fig.width=20, fig.height=12}
 ggplot(scores.sim %>% unnest(cols=scores), aes(x=scores)) +
-  geom_histogram(bins=50, fill="skyblue", color="black") +
+  geom_histogram(bins=60, fill="skyblue", color=NA) +
   facet_wrap(~ team, scales="free_y") +
   labs(title="Score distribution for each team")
 ```
-
+The plots above show that the simulated score for each team is approximately normal.

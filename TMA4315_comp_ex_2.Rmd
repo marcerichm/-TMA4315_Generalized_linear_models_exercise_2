@@ -26,7 +26,7 @@ library(knitr)
 library(ggplot2)
 library(tidyverse)
 library(glue)      # fstring-like
-library(doSNOW)    # Parallel computing
+# library(doSNOW)    # Parallel computing
 library(foreach)
 ```
 
@@ -260,20 +260,20 @@ simulate_dataframe <- function() {
 ```
 
 ```{r}
-num_cores <- parallel::detectCores() - 1
-cl <- makeCluster(num_cores, type="SOCK")
-registerDoSNOW(cl)
+# num_cores <- parallel::detectCores() - 1
+# cl <- makeCluster(num_cores, type="SOCK")
+# registerDoSNOW(cl)
 
 scores.sim <- foreach(
   i=1:m,
   .packages='tidyverse'
-) %dopar%
+) %do%
   {calculate_scores(rbind(eliteserie.played, simulate_dataframe()))} %>%
   bind_rows() %>%
   group_by(team) %>%
   summarize(scores=list(score), score.mean=mean(score), score.sd=sd(score))
 
-stopCluster(cl)
+# stopCluster(cl)
 ```
 
 
